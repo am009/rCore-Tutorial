@@ -13,6 +13,7 @@ use xmas_elf::{
     program::{SegmentData, Type},
     ElfFile,
 };
+use core::slice::from_raw_parts;
 
 /// 一个进程所有关于内存空间管理的信息
 pub struct MemorySet {
@@ -20,6 +21,28 @@ pub struct MemorySet {
     pub mapping: Mapping,
     /// 每个字段
     pub segments: Vec<Segment>,
+}
+
+impl Clone for MemorySet {
+    /// fork进程时复制内存内容
+    fn clone(&self) -> Self {
+        let mut memory_set = MemorySet::new_kernel().unwrap();
+        for segment in self.segments.iter() {
+            if memory_set.segments.iter().position(|seg| seg == segment).is_some() {
+                continue;
+            } else {
+                // 找到了特有的(非内核的)映射
+                assert_ne!(segment.map_type, MapType::Linear);
+                let addr = segment.range.start;
+                // 转换为对应的u8数组作为初始化的内容
+                let data = unsafe { from_raw_parts(addr.0 as *const u8, segment.range.len()) };
+                memory_set.add_segment(segment.clone(), Some(data)).unwrap();
+            }
+        }
+        // println!("from:\n{:x?}", self.segments);
+        // println!("to:\n{:x?}", memory_set.segments);
+        memory_set
+    }
 }
 
 impl MemorySet {

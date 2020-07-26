@@ -179,6 +179,32 @@ impl Mapping {
         Some(PhysicalAddress(base + offset))
     }
 
+    /// 查找当前mapping虚拟地址对应的物理地址
+    pub fn lookup_self(&self, va: VirtualAddress) -> Option<PhysicalAddress> {
+        let current_ppn = self.root_ppn;
+
+        let root_table: &PageTable =
+            PhysicalAddress::from(current_ppn).deref_kernel();
+        let vpn = VirtualPageNumber::floor(va);
+        let mut entry = &root_table.entries[vpn.levels()[0]];
+        // 为了支持大页的查找，我们用 length 表示查找到的物理页需要加多少位的偏移
+        let mut length = 12 + 2 * 9;
+        for vpn_slice in &vpn.levels()[1..] {
+            if entry.is_empty() {
+                return None;
+            }
+            if entry.has_next_level() {
+                length -= 9;
+                entry = &mut entry.get_next_table().entries[*vpn_slice];
+            } else {
+                break;
+            }
+        }
+        let base = PhysicalAddress::from(entry.page_number()).0;
+        let offset = va.0 & ((1 << length) - 1);
+        Some(PhysicalAddress(base + offset))
+    }
+
     /// 为给定的虚拟 / 物理页号建立映射关系
     fn map_one(
         &mut self,
