@@ -33,10 +33,7 @@ impl Clone for MemorySet {
             } else {
                 // 找到了特有的(非内核的)映射
                 assert_ne!(segment.map_type, MapType::Linear);
-                let addr = segment.range.start;
-                // 转换为对应的u8数组作为初始化的内容
-                let data = unsafe { from_raw_parts(addr.0 as *const u8, segment.range.len()) };
-                memory_set.add_segment(segment.clone(), Some(data)).unwrap();
+                memory_set.clone_segment(segment.clone(), &self.mapping).unwrap();
             }
         }
         // println!("from:\n{:x?}", self.segments);
@@ -46,6 +43,15 @@ impl Clone for MemorySet {
 }
 
 impl MemorySet {
+    /// fork时复制segment
+    pub fn clone_segment(&mut self, segment: Segment, from: &Mapping) -> MemoryResult<()> {
+        // 检测 segment 没有重合
+        assert!(!self.overlap_with(segment.page_range()));
+        // 映射并将新分配的页面保存下来
+        self.mapping.map_clone(&segment, from)?;
+        self.segments.push(segment);
+        Ok(())
+    }
     /// 创建内核重映射
     pub fn new_kernel() -> MemoryResult<MemorySet> {
         // 在 linker.ld 里面标记的各个字段的起始点，均为 4K 对齐
