@@ -36,6 +36,7 @@ pub struct ThreadInner {
 impl Thread {
     pub fn fork_thread(&self) -> MemoryResult<Arc<Thread>> {
         let inner = self.inner();
+        let new_context = inner.context.unwrap().clone();
         let thread = Arc::new(Thread {
             id: unsafe {
                 THREAD_COUNTER += 1;
@@ -44,7 +45,7 @@ impl Thread {
             stack: self.stack, // Range实现了Copy
             process: Arc::new(self.process.as_ref().clone()),
             inner: Mutex::new(ThreadInner {
-                context: Some(inner.context.unwrap().clone()),
+                context: Some(new_context),
                 sleeping: inner.sleeping,
                 dead: inner.dead
             }),

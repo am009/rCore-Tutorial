@@ -6,6 +6,7 @@ pub const SYS_READ: usize = 63;
 pub const SYS_WRITE: usize = 64;
 pub const SYS_EXIT: usize = 93;
 pub const SYS_TID: usize = 94;
+pub const SYS_FORK: usize = 95;
 
 /// 系统调用在内核之内的返回值
 pub(super) enum SyscallResult {
@@ -15,6 +16,7 @@ pub(super) enum SyscallResult {
     Park(isize),
     /// 丢弃当前 context，调度下一个线程继续执行
     Kill,
+    Fork,
 }
 
 /// 系统调用的总入口
@@ -30,6 +32,7 @@ pub fn syscall_handler(context: &mut Context) -> *mut Context {
         SYS_WRITE => sys_write(args[0], args[1] as *mut u8, args[2]),
         SYS_EXIT => sys_exit(args[0]),
         SYS_TID => sys_tid(),
+        SYS_FORK => sys_fork(),
         _ => {
             println!("unimplemented syscall: {}", syscall_id);
             SyscallResult::Kill
@@ -53,6 +56,19 @@ pub fn syscall_handler(context: &mut Context) -> *mut Context {
             // 终止，跳转到 PROCESSOR 调度的下一个线程
             PROCESSOR.lock().kill_current_thread();
             PROCESSOR.lock().prepare_next_thread()
+        }
+        SyscallResult::Fork => {
+            context.x[10] = 1 as usize;
+            let mut processor = PROCESSOR.lock();
+            processor.park_current_thread(context);
+            let child = processor.current_thread().fork_thread().unwrap();
+            {
+                let mut inner = child.inner();
+                let cont = inner.context.as_mut().unwrap();
+                cont.set_arguments(&[0 as usize]);
+            }
+            processor.add_thread(child);
+            processor.prepare_next_thread()
         }
     }
 }

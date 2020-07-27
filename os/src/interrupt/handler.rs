@@ -95,14 +95,14 @@ fn supervisor_external(context: &mut Context) -> *mut Context {
         return PROCESSOR.lock().prepare_next_thread()
     }
     // press f to fork
-    if c == 102 {
-        println!("start fork");
-        let mut processor = PROCESSOR.lock();
-        processor.park_current_thread(context);
-        let new = processor.current_thread().fork_thread().unwrap();
-        processor.add_thread(new);
-        return processor.prepare_next_thread()
-    }
+    // if c == 102 {
+    //     println!("start fork");
+    //     let mut processor = PROCESSOR.lock();
+    //     processor.park_current_thread(context);
+    //     let new = processor.current_thread().fork_thread().unwrap();
+    //     processor.add_thread(new);
+    //     return processor.prepare_next_thread()
+    // }
     if c <= 255 {
         if c == '\r' as usize {
             c = '\n' as usize;
