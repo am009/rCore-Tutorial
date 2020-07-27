@@ -25,3 +25,4 @@ user/target
 user/build
 # GDB 临时文件
 .gdb_history
+target/

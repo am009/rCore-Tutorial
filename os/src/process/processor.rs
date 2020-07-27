@@ -98,6 +98,12 @@ impl Processor {
         self.scheduler.add_thread(thread);
     }
 
+    /// 添加一个待执行的线程
+    pub fn add_thread_prio(&mut self, thread: Arc<Thread>, prio: usize) {
+        self.scheduler.add_thread(thread.clone());
+        self.scheduler.set_priority(thread, prio);
+    }
+
     /// 唤醒一个休眠线程
     pub fn wake_thread(&mut self, thread: Arc<Thread>) {
         thread.inner().sleeping = false;
