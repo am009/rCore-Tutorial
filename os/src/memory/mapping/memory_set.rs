@@ -13,6 +13,7 @@ use xmas_elf::{
     program::{SegmentData, Type},
     ElfFile,
 };
+use core::slice::from_raw_parts;
 
 /// 一个进程所有关于内存空间管理的信息
 pub struct MemorySet {
@@ -22,7 +23,35 @@ pub struct MemorySet {
     pub segments: Vec<Segment>,
 }
 
+impl Clone for MemorySet {
+    /// fork进程时复制内存内容
+    fn clone(&self) -> Self {
+        let mut memory_set = MemorySet::new_kernel().unwrap();
+        for segment in self.segments.iter() {
+            if memory_set.segments.iter().position(|seg| seg == segment).is_some() {
+                continue;
+            } else {
+                // 找到了特有的(非内核的)映射
+                assert_ne!(segment.map_type, MapType::Linear);
+                memory_set.clone_segment(segment.clone(), &self.mapping).unwrap();
+            }
+        }
+        // println!("from:\n{:x?}", self.segments);
+        // println!("to:\n{:x?}", memory_set.segments);
+        memory_set
+    }
+}
+
 impl MemorySet {
+    /// fork时复制segment
+    pub fn clone_segment(&mut self, segment: Segment, from: &Mapping) -> MemoryResult<()> {
+        // 检测 segment 没有重合
+        assert!(!self.overlap_with(segment.page_range()));
+        // 映射并将新分配的页面保存下来
+        self.mapping.map_clone(&segment, from)?;
+        self.segments.push(segment);
+        Ok(())
+    }
     /// 创建内核重映射
     pub fn new_kernel() -> MemoryResult<MemorySet> {
         // 在 linker.ld 里面标记的各个字段的起始点，均为 4K 对齐

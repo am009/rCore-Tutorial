@@ -19,6 +19,22 @@ pub struct ProcessInner {
     pub descriptors: Vec<Arc<dyn INode>>,
 }
 
+impl Clone for Process {
+    fn clone(&self) -> Self {
+        let mut descriptors = Vec::new();
+        for desc in self.inner().descriptors.iter() {
+            descriptors.push(desc.clone());
+        }
+        Self {
+            is_user: self.is_user,
+            inner: Mutex::new(ProcessInner {
+                memory_set: self.inner().memory_set.clone(),
+                descriptors
+            }),
+        }
+    }
+}
+
 #[allow(unused)]
 impl Process {
     /// 创建一个内核进程

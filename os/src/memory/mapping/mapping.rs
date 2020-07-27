@@ -13,6 +13,7 @@ use crate::memory::{
 use alloc::{collections::VecDeque, vec, vec::Vec};
 use core::cmp::min;
 use core::ptr::slice_from_raw_parts_mut;
+use core::slice::from_raw_parts;
 
 #[derive(Default)]
 /// 某个线程的内存映射关系
@@ -26,6 +27,52 @@ pub struct Mapping {
 }
 
 impl Mapping {
+    pub fn map_clone(&mut self, segment: &Segment, from: &Mapping) -> MemoryResult<()> {
+        match segment.map_type {
+            // 线性映射，直接对虚拟地址进行转换
+            MapType::Linear => {
+                panic!("Mapping: cannot clone linear segment.");
+            }
+            // 需要分配帧进行映射
+            MapType::Framed => {
+                for vpn in segment.page_range().iter() {
+                    // 页面的数据，默认为全零
+                    let mut page_data = [0u8; PAGE_SIZE];
+                    // 这里必须进行一些调整，因为传入的数据可能并非按照整页对齐
+
+                    // 拷贝时必须考虑区间与整页不对齐的情况
+                    //    start（仅第一页时非零）
+                    //      |        stop（仅最后一页时非零）
+                    // 0    |---data---|          4096
+                    // |------------page------------|
+                    let page_address = VirtualAddress::from(vpn);
+                    let start = if segment.range.start > page_address {
+                        segment.range.start - page_address
+                    } else {
+                        0
+                    };
+                    let stop = min(PAGE_SIZE, segment.range.end - page_address);
+                    // 计算来源和目标区间并进行拷贝
+                    let dst_slice = &mut page_data[start..stop];
+                    // let src_slice = &init_data[(page_address + start - segment.range.start)
+                    //     ..(page_address + stop - segment.range.start)];
+                    let addr: VirtualAddress = from.lookup_self(page_address).unwrap().into();
+                    let src_slice = & unsafe { from_raw_parts(addr.0 as *const u8, PAGE_SIZE) } [start..stop];
+                    dst_slice.copy_from_slice(src_slice);
+
+                    // 建立映射
+                    let mut frame = FRAME_ALLOCATOR.lock().alloc()?;
+                    // 更新页表
+                    self.map_one(vpn, Some(frame.page_number()), segment.flags)?;
+                    // 写入数据
+                    (*frame).copy_from_slice(&page_data);
+                    // 保存
+                    self.mapped_pairs.push_back((vpn, frame));
+                }
+            }
+        }
+        Ok(())
+    }
     /// 将当前的映射加载到 `satp` 寄存器并记录
     pub fn activate(&self) {
         // satp 低 27 位为页号，高 4 位为模式，8 表示 Sv39
@@ -159,6 +206,32 @@ impl Mapping {
 
         let root_table: &PageTable =
             PhysicalAddress::from(PhysicalPageNumber(current_ppn)).deref_kernel();
+        let vpn = VirtualPageNumber::floor(va);
+        let mut entry = &root_table.entries[vpn.levels()[0]];
+        // 为了支持大页的查找，我们用 length 表示查找到的物理页需要加多少位的偏移
+        let mut length = 12 + 2 * 9;
+        for vpn_slice in &vpn.levels()[1..] {
+            if entry.is_empty() {
+                return None;
+            }
+            if entry.has_next_level() {
+                length -= 9;
+                entry = &mut entry.get_next_table().entries[*vpn_slice];
+            } else {
+                break;
+            }
+        }
+        let base = PhysicalAddress::from(entry.page_number()).0;
+        let offset = va.0 & ((1 << length) - 1);
+        Some(PhysicalAddress(base + offset))
+    }
+
+    /// 查找当前mapping虚拟地址对应的物理地址
+    pub fn lookup_self(&self, va: VirtualAddress) -> Option<PhysicalAddress> {
+        let current_ppn = self.root_ppn;
+
+        let root_table: &PageTable =
+            PhysicalAddress::from(current_ppn).deref_kernel();
         let vpn = VirtualPageNumber::floor(va);
         let mut entry = &root_table.entries[vpn.levels()[0]];
         // 为了支持大页的查找，我们用 length 表示查找到的物理页需要加多少位的偏移

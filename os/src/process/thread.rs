@@ -34,6 +34,23 @@ pub struct ThreadInner {
 }
 
 impl Thread {
+    pub fn fork_thread(&self) -> MemoryResult<Arc<Thread>> {
+        let inner = self.inner();
+        let thread = Arc::new(Thread {
+            id: unsafe {
+                THREAD_COUNTER += 1;
+                THREAD_COUNTER
+            },
+            stack: self.stack, // Range实现了Copy
+            process: Arc::new(self.process.as_ref().clone()),
+            inner: Mutex::new(ThreadInner {
+                context: Some(inner.context.unwrap().clone()),
+                sleeping: inner.sleeping,
+                dead: inner.dead
+            }),
+        });
+        Ok(thread)
+    }
     /// 准备执行一个线程
     ///
     /// 激活对应进程的页表，并返回其 Context
