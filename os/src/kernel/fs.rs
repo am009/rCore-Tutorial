@@ -2,6 +2,7 @@
 
 use super::*;
 use core::slice::from_raw_parts_mut;
+use crate::fs::{INodeExt, ROOT_INODE};
 
 /// 从指定的文件中读取字符
 ///
@@ -42,4 +43,18 @@ pub(super) fn sys_write(fd: usize, buffer: *mut u8, size: usize) -> SyscallResul
         }
     }
     SyscallResult::Proceed(-1)
+}
+
+pub(super) fn sys_open(str_buf: *mut u8, size: usize) -> SyscallResult {
+    let buffer = unsafe { from_raw_parts_mut(str_buf, size) };
+    let mut ret = SyscallResult::Proceed(-1);
+    if let Ok(name) = core::str::from_utf8(buffer) {
+        if let Ok(inode) = ROOT_INODE.find(name) {
+            let current = PROCESSOR.lock().current_thread();
+            let vec = &mut current.process.inner().descriptors;
+            vec.push(inode);
+            ret = SyscallResult::Proceed((vec.len() - 1) as isize);
+        }
+    }
+    ret
 }

@@ -7,6 +7,7 @@ pub const SYS_WRITE: usize = 64;
 pub const SYS_EXIT: usize = 93;
 pub const SYS_TID: usize = 94;
 pub const SYS_FORK: usize = 95;
+pub const SYS_OPEN: usize = 96;
 
 /// 系统调用在内核之内的返回值
 pub(super) enum SyscallResult {
@@ -33,6 +34,7 @@ pub fn syscall_handler(context: &mut Context) -> *mut Context {
         SYS_EXIT => sys_exit(args[0]),
         SYS_TID => sys_tid(),
         SYS_FORK => sys_fork(),
+        SYS_OPEN => sys_open(args[0] as *mut u8, args[1]),
         _ => {
             println!("unimplemented syscall: {}", syscall_id);
             SyscallResult::Kill

@@ -13,7 +13,6 @@ use xmas_elf::{
     program::{SegmentData, Type},
     ElfFile,
 };
-use core::slice::from_raw_parts;
 
 /// 一个进程所有关于内存空间管理的信息
 pub struct MemorySet {

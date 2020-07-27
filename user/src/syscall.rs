@@ -8,6 +8,7 @@ const SYSCALL_WRITE: usize = 64;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_TID: usize = 94;
 const SYSCALL_FORK: usize = 95;
+const SYSCALL_OPEN: usize = 96;
 
 /// 将参数放在对应寄存器中，并执行 `ecall`
 fn syscall(id: usize, arg0: usize, arg1: usize, arg2: usize) -> isize {
@@ -60,4 +61,10 @@ pub fn sys_tid() -> isize {
 
 pub fn sys_fork() -> isize {
     syscall(SYSCALL_FORK, 0, 0, 0)
+}
+
+pub fn sys_open(buffer: &[u8]) -> isize {
+    syscall(SYSCALL_OPEN,
+        buffer as *const [u8] as *const u8 as usize,
+        buffer.len(), 0)
 }

@@ -29,6 +29,7 @@ build: dependency
 	@echo Targets: $(patsubst $(SRC_DIR)/%.rs, %, $(SRC_FILES))
 	@rm -rf $(OUT_DIR)
 	@mkdir -p $(OUT_DIR)
+	echo "789" > $(OUT_DIR)/tmp.txt
 	@cp $(BIN_FILES) $(OUT_DIR)
 	@rcore-fs-fuse --fs sfs $(IMG_FILE) $(OUT_DIR) zip
 	@qemu-img convert -f raw $(IMG_FILE) -O qcow2 $(QCOW_FILE)
