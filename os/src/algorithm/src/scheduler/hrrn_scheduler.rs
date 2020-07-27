@@ -60,7 +60,8 @@ impl<ThreadType: Clone + Eq> Scheduler<ThreadType> for HrrnScheduler<ThreadType>
     fn remove_thread(&mut self, thread: &ThreadType) {
         // 移除相应的线程并且确认恰移除一个线程
         let mut removed = self.pool.drain_filter(|t| t.thread == *thread);
-        assert!(removed.next().is_some() && removed.next().is_none());
+        assert!(removed.next().is_some());
+        assert!(removed.next().is_none());
     }
     fn set_priority(&mut self, _thread: ThreadType, _priority: ()) {}
 }

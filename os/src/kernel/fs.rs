@@ -2,7 +2,7 @@
 
 use super::*;
 use core::slice::from_raw_parts_mut;
-use crate::fs::{INodeExt, ROOT_INODE};
+use crate::fs::{new_pipe, ROOT_INODE};
 
 /// 从指定的文件中读取字符
 ///
@@ -37,8 +37,11 @@ pub(super) fn sys_write(fd: usize, buffer: *mut u8, size: usize) -> SyscallResul
         // 尝试写入
         if let Ok(ret) = inode.write_at(0, buffer) {
             let ret = ret as isize;
-            if ret >= 0 {
+            if ret > 0 {
                 return SyscallResult::Proceed(ret);
+            }
+            if ret == 0 {
+                return SyscallResult::Park(ret);
             }
         }
     }
@@ -57,4 +60,14 @@ pub(super) fn sys_open(str_buf: *mut u8, size: usize) -> SyscallResult {
         }
     }
     ret
+}
+
+pub(super) fn sys_pipe() -> SyscallResult {
+    let (in_node, out_node) = new_pipe();
+    let current = PROCESSOR.lock().current_thread();
+    let vec = &mut current.process.inner().descriptors;
+    vec.push(in_node);
+    vec.push(out_node);
+    let len = vec.len();
+    SyscallResult::Proceed2((len - 2) as isize, (len - 1) as isize)
 }

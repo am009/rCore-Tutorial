@@ -8,11 +8,13 @@ pub const SYS_EXIT: usize = 93;
 pub const SYS_TID: usize = 94;
 pub const SYS_FORK: usize = 95;
 pub const SYS_OPEN: usize = 96;
+pub const SYS_PIPE: usize = 97;
 
 /// 系统调用在内核之内的返回值
 pub(super) enum SyscallResult {
     /// 继续执行，带返回值
     Proceed(isize),
+    Proceed2(isize, isize),
     /// 记录返回值，但暂存当前线程
     Park(isize),
     /// 丢弃当前 context，调度下一个线程继续执行
@@ -35,6 +37,7 @@ pub fn syscall_handler(context: &mut Context) -> *mut Context {
         SYS_TID => sys_tid(),
         SYS_FORK => sys_fork(),
         SYS_OPEN => sys_open(args[0] as *mut u8, args[1]),
+        SYS_PIPE => sys_pipe(),
         _ => {
             println!("unimplemented syscall: {}", syscall_id);
             SyscallResult::Kill
@@ -45,6 +48,11 @@ pub fn syscall_handler(context: &mut Context) -> *mut Context {
         SyscallResult::Proceed(ret) => {
             // 将返回值放入 context 中
             context.x[10] = ret as usize;
+            context
+        }
+        SyscallResult::Proceed2(ret1, ret2) => {
+            context.x[10] = ret1 as usize;
+            context.x[11] = ret2 as usize;
             context
         }
         SyscallResult::Park(ret) => {
