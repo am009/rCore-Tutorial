@@ -15,7 +15,8 @@ const BIG_STRIDE: usize =  1 << (core::mem::size_of::<usize>() * 8 - 2);
 
 pub struct StrideScheduler<ThreadType: Clone + Eq> {
     pool: BinaryHeap<StrideInner<ThreadType>>,
-    global_pass: usize
+    global_pass: usize,
+    global_priority: usize
 }
 
 impl<ThreadType: Clone + Eq> PartialEq for StrideInner<ThreadType> {
@@ -50,6 +51,7 @@ impl<ThreadType: Clone + Eq> Default for StrideScheduler<ThreadType> {
         Self {
             pool: BinaryHeap::new(),
             global_pass: 0,
+            global_priority: 0,
         }
     }
 }
@@ -58,11 +60,12 @@ impl<ThreadType: Clone + Eq> Scheduler<ThreadType> for StrideScheduler<ThreadTyp
     type Priority = usize;
 
     fn add_thread(&mut self, thread: ThreadType) {
+        self.global_priority += 1024;
         self.pool.push(StrideInner {
             pass: self.global_pass,
             priority: Cell::new(1024),
             thread,
-        })
+        });
     }
     fn get_next(&mut self) -> Option<ThreadType> {
         if let Some(mut selected) = self.pool.pop() {
@@ -70,6 +73,7 @@ impl<ThreadType: Clone + Eq> Scheduler<ThreadType> for StrideScheduler<ThreadTyp
             let ret = Some(selected.thread.clone());
             self.pool.push(selected);
             // update global pass
+            self.global_pass += BIG_STRIDE / self.global_priority;
             return ret;
         }
         None
@@ -81,6 +85,7 @@ impl<ThreadType: Clone + Eq> Scheduler<ThreadType> for StrideScheduler<ThreadTyp
             if inner.thread == *thread {
                 assert_eq!(found, false);
                 found = true;
+                self.global_priority -= inner.priority.get();
             }
         }
         assert_eq!(found, true);
@@ -92,13 +97,21 @@ impl<ThreadType: Clone + Eq> Scheduler<ThreadType> for StrideScheduler<ThreadTyp
             panic!("priority cannot be 0")
         }
         let mut found = false;
+        let mut new_inner = StrideInner {
+            thread: thread.clone(),
+            priority: Cell::new(priority),
+            pass: self.global_pass
+        };
         for inner in self.pool.iter() {
             if inner.thread == thread {
                 assert_eq!(found, false);
                 found = true;
-                inner.priority.set(priority);
+                self.global_priority += priority;
+                new_inner.pass =  inner.pass / priority * inner.priority.get();
             }
         }
         assert_eq!(found, true);
+        self.remove_thread(&thread);
+        self.pool.push(new_inner);
     }
 }
