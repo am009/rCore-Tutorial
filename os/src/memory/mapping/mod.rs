@@ -10,6 +10,7 @@ mod page_table;
 mod page_table_entry;
 mod segment;
 mod swapper;
+mod clock_swapper;
 
 pub use mapping::Mapping;
 pub use memory_set::MemorySet;

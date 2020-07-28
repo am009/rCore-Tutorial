@@ -48,6 +48,9 @@ impl PageTableEntry {
                 .set_bits(PAGE_NUMBER_RANGE, 0);
         }
     }
+    pub fn clear_accessed(&mut self) {
+        self.0.set_bit(6, false);
+    }
     /// 清除
     pub fn clear(&mut self) {
         self.0 = 0;

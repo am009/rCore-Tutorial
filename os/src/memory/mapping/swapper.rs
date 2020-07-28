@@ -3,6 +3,7 @@
 use super::*;
 use crate::memory::{frame::FrameTracker, *};
 use alloc::collections::VecDeque;
+use super::clock_swapper::ClockSwapper;
 
 /// 管理一个线程所映射的页面的置换操作
 pub trait Swapper {
@@ -22,7 +23,8 @@ pub trait Swapper {
     fn retain(&mut self, predicate: impl Fn(&VirtualPageNumber) -> bool);
 }
 
-pub type SwapperImpl = FIFOSwapper;
+pub type SwapperImpl = ClockSwapper;
+// pub type SwapperImpl = FIFOSwapper;
 
 /// 页面置换算法基础实现：FIFO
 pub struct FIFOSwapper {
